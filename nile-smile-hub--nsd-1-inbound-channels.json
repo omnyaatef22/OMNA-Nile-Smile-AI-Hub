@@ -1,0 +1,878 @@
+{
+  "name": "NSD 1 · Inbound Channels",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "id": "n218",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "config",
+            "payload": "={{ {} }}"
+          },
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n219",
+      "name": "Get Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One bot = one webhook. Customers, staff commands and button clicks all arrive here,\n// so we sort them before anything else happens.\nconst cfg = $('Get Config').first().json;\nconst u = $('Telegram Trigger').first().json;\nconst staff = String(cfg.STAFF_CHAT_ID || '');\nconst fullName = f => [f?.first_name, f?.last_name].filter(Boolean).join(' ');\n\nif (u.callback_query) {\n  const q = u.callback_query;\n  const chatId = String(q.message?.chat?.id ?? '');\n  if (!staff || chatId !== staff) return [{ json: { kind: 'ignore', reason: 'button outside staff group' } }];\n  return [{ json: { kind: 'staff_callback', payload: {\n    callback_query_id: q.id, data: q.data, from_name: fullName(q.from), from_username: q.from?.username || '',\n    chat_id: chatId, message_id: q.message?.message_id, message_text: q.message?.text || '' } } }];\n}\n\nconst m = u.message;\nif (!m) return [{ json: { kind: 'ignore', reason: 'unsupported update type' } }];\nconst chatId = String(m.chat.id);\nconst text = String(m.text || m.caption || '').trim();\n\nif (m.chat.type !== 'private') {\n  if (/^\\/groupid\\b/i.test(text)) return [{ json: { kind: 'groupid', chat_id: chatId, chat_title: m.chat.title || '' } }];\n  if (staff && chatId === staff && text.startsWith('/')) return [{ json: { kind: 'staff_command', payload: {\n    text, chat_id: chatId, message_id: m.message_id, from_name: fullName(m.from), from_username: m.from?.username || '' } } }];\n  return [{ json: { kind: 'ignore', reason: 'group chatter' } }];\n}\nif (m.from?.is_bot) return [{ json: { kind: 'ignore', reason: 'bot message' } }];\n\nlet type = 'text';\nif (!text) type = m.photo ? 'image' : m.voice ? 'voice' : m.audio ? 'audio' : m.video ? 'video'\n  : m.document ? 'document' : m.sticker ? 'sticker' : m.location ? 'location' : 'other';\nreturn [{ json: { kind: 'customer', dedup_key: `telegram:${chatId}:${m.message_id}`, core: {\n  channel: 'telegram', channel_user_id: chatId, message_id: String(m.message_id),\n  text: /^\\/start\\b/i.test(text) ? 'Hello' : text, message_type: type,\n  customer_name: fullName(m.from), received_at: new Date(m.date * 1000).toISOString() } } }];"
+      },
+      "id": "n220",
+      "name": "Classify Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c221",
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "customer"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Customer"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c222",
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "staff_callback"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Staff Button"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c223",
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "staff_command"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Staff Command"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c224",
+                    "leftValue": "={{ $json.kind }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "groupid"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Group ID"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Ignore"
+        }
+      },
+      "id": "n225",
+      "name": "Route Update",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "logic": "removeItemsWithAlreadySeenKeyValues",
+        "dedupeValue": "={{ $json.dedup_key }}",
+        "options": {
+          "historySize": 10000
+        }
+      },
+      "id": "n226",
+      "name": "Skip Repeated Delivery",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        900,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 2 · Core AI Brain"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "={{ $json.core.channel }}",
+            "channel_user_id": "={{ $json.core.channel_user_id }}",
+            "message_id": "={{ $json.core.message_id }}",
+            "text": "={{ $json.core.text }}",
+            "message_type": "={{ $json.core.message_type }}",
+            "customer_name": "={{ $json.core.customer_name }}",
+            "received_at": "={{ $json.core.received_at }}"
+          },
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "schema": [
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "channel_user_id",
+              "displayName": "channel_user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message_type",
+              "displayName": "message_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "received_at",
+              "displayName": "received_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n227",
+      "name": "Run Core AI Brain",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        60
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "staff_callback",
+            "payload": "={{ $json.payload }}"
+          },
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n228",
+      "name": "Staff Button Click",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        900,
+        240
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "staff_command",
+            "payload": "={{ $json.payload }}"
+          },
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n229",
+      "name": "Staff /reply Command",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        900,
+        400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=This chat ID is {{ $json.chat_id }}\nPaste it into STAFF_CHAT_ID in the workflow \"NSD 3 · Delivery & Staff Desk (Config Values node)\".",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "n230",
+      "name": "Reply with Group ID",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        560
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n231",
+      "name": "Ignore",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "nsd-meta",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n232",
+      "name": "Meta Verification (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "config",
+            "payload": "={{ {} }}"
+          },
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n233",
+      "name": "Get Config (Verify)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c234",
+              "leftValue": "={{ $('Meta Verification (GET)').first().json.query['hub.mode'] }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "subscribe"
+            },
+            {
+              "id": "c235",
+              "leftValue": "={{ $('Meta Verification (GET)').first().json.query['hub.verify_token'] }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "={{ $('Get Config (Verify)').first().json.META_VERIFY_TOKEN }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n236",
+      "name": "Verify Token Matches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('Meta Verification (GET)').first().json.query['hub.challenge'] }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "n237",
+      "name": "Return Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        680,
+        1020
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "n238",
+      "name": "Reject (403)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        680,
+        1180
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nsd-meta",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n239",
+      "name": "Incoming Events (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        1460
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "n240",
+      "name": "Acknowledge Fast (200)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        220,
+        1460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Messenger and Instagram share one webhook URL. The payload's `object` tells them apart:\n// \"page\" = Facebook Messenger, \"instagram\" = Instagram DMs. Echoes are copies of OUR replies: skip them.\nconst body = $('Incoming Events (POST)').first().json.body || {};\nconst channel = { page: 'messenger', instagram: 'instagram' }[body.object];\nif (!channel) return [];\nconst out = [];\nfor (const entry of body.entry || []) {\n  for (const ev of entry.messaging || []) {\n    const m = ev.message;\n    if (!m || m.is_echo || m.is_deleted) continue;\n    if (String(ev.sender?.id) === String(entry.id)) continue;\n    const text = m.text || m.quick_reply?.payload || '';\n    const type = text ? 'text' : (m.attachments?.[0]?.type || 'other');\n    out.push({ json: { dedup_key: `${channel}:${m.mid}`, core: {\n      channel, channel_user_id: String(ev.sender.id), message_id: m.mid, text,\n      message_type: type, customer_name: '', received_at: new Date(Number(ev.timestamp)).toISOString() } } });\n  }\n}\nreturn out;"
+      },
+      "id": "n241",
+      "name": "Extract Messenger & Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        1460
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "wa-trigger",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The WhatsApp Trigger hands us WhatsApp's \"change\" objects: contacts, messages and statuses.\n// Delivery and read receipts (statuses) are not customer messages, so only `messages` count.\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const values = Array.isArray(j.entry) ? j.entry.flatMap(e => (e.changes || []).map(c => c.value || {})) : [j];\n  for (const v of values) {\n    if (!Array.isArray(v.messages)) continue;\n    const names = Object.fromEntries((v.contacts || []).map(c => [c.wa_id, c.profile?.name || '']));\n    for (const m of v.messages) {\n      const text = m.type === 'text' ? m.text?.body\n        : m.type === 'button' ? m.button?.text\n        : m.type === 'interactive' ? (m.interactive?.button_reply?.title || m.interactive?.list_reply?.title)\n        : (m[m.type]?.caption || '');\n      out.push({ json: { dedup_key: `whatsapp:${m.id}`, core: {\n        channel: 'whatsapp', channel_user_id: m.from, message_id: m.id, text: text || '',\n        message_type: text ? 'text' : m.type, customer_name: names[m.from] || '',\n        received_at: new Date(Number(m.timestamp) * 1000).toISOString() } } });\n    }\n  }\n}\nreturn out;"
+      },
+      "id": "extract-whatsapp-messages",
+      "name": "Extract WhatsApp Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        880
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Config": {
+      "main": [
+        [
+          {
+            "node": "Classify Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Update": {
+      "main": [
+        [
+          {
+            "node": "Route Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Update": {
+      "main": [
+        [
+          {
+            "node": "Skip Repeated Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Staff Button Click",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Staff /reply Command",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply with Group ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Repeated Delivery": {
+      "main": [
+        [
+          {
+            "node": "Run Core AI Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta Verification (GET)": {
+      "main": [
+        [
+          {
+            "node": "Get Config (Verify)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Config (Verify)": {
+      "main": [
+        [
+          {
+            "node": "Verify Token Matches?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Token Matches?": {
+      "main": [
+        [
+          {
+            "node": "Return Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject (403)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incoming Events (POST)": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Fast (200)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge Fast (200)": {
+      "main": [
+        [
+          {
+            "node": "Extract Messenger & Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Messenger & Instagram": {
+      "main": [
+        [
+          {
+            "node": "Skip Repeated Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract WhatsApp Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract WhatsApp Messages": {
+      "main": [
+        [
+          {
+            "node": "Skip Repeated Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Cairo"
+  }
+}

@@ -1,0 +1,2696 @@
+{
+  "name": "NSD 3 · Delivery & Staff Desk",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "action"
+            },
+            {
+              "name": "payload",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "n89",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -64,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-config",
+                    "leftValue": "={{ $('When Called').first().json.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "config"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Config"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "r-send",
+                    "leftValue": "={{ $('When Called').first().json.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "send"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Send Reply"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c91",
+                    "leftValue": "={{ $('When Called').first().json.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "new_ticket_alert"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "New Ticket"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c92",
+                    "leftValue": "={{ $('When Called').first().json.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "customer_followup"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Customer Follow-up"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c93",
+                    "leftValue": "={{ $('When Called').first().json.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "staff_callback"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Button Click"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c94",
+                    "leftValue": "={{ $('When Called').first().json.action }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "staff_command"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Staff Command"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown"
+        }
+      },
+      "id": "n95",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        384,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=Handoff: unknown action \"{{ $('When Called').first().json.action }}\""
+      },
+      "id": "n96",
+      "name": "Unknown Action",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        640,
+        2416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst cfg = $('Config Values').first().json;\nconst p = $('When Called').first().json.payload || {};\nif (!cfg.STAFF_CHAT_ID) throw new Error('Config: STAFF_CHAT_ID is empty. Send /groupid in the staff group and paste the ID into NSD 3 · Delivery & Staff Desk (Config Values node).');\nconst icon = { urgent: '🚨', high: '🔴', normal: '🟡' }[p.priority] || '🟡';\nconst test = p.channel === 'test' ? '[TEST] ' : '';\nconst due = DateTime.fromISO(String(p.sla_due_at)).setZone(cfg.TIMEZONE);\nconst text = [\n  `${icon} <b>${test}New ${esc(String(p.type).replace('_', ' '))} ticket ${esc(p.ticket_id)}</b>`,\n  `👤 ${esc(p.customer_name)} · ${esc(p.channel)} · ${esc(p.language)}`,\n  `Priority: <b>${esc(p.priority)}</b> · Urgency: ${esc(p.urgency)} · Sentiment: ${esc(p.sentiment)}`,\n  `SLA: take before ${due.isValid ? due.toFormat('HH:mm') : '-'}`,\n  '',\n  `📝 ${esc(p.summary)}`,\n  `💬 \"${esc(String(p.last_customer_message || '').slice(0, 400))}\"`,\n  '',\n  `Reply: <code>/reply ${esc(p.ticket_id)} your message</code>`,\n].join('\\n');\nreturn [{ json: { chat_id: cfg.STAFF_CHAT_ID, text, ticket_id: p.ticket_id } }];"
+      },
+      "id": "n97",
+      "name": "Format Ticket Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✋ Take",
+                    "additionalFields": {
+                      "callback_data": "=take:{{ $json.ticket_id }}"
+                    }
+                  },
+                  {
+                    "text": "✅ Resolve",
+                    "additionalFields": {
+                      "callback_data": "=resolve:{{ $json.ticket_id }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "n98",
+      "name": "Post Ticket to Staff",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        704
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Format Ticket Alert').first().json.ticket_id }}",
+            "staff_message_id": "={{ String($json.result?.message_id ?? $json.message_id ?? '') }}"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "staff_message_id",
+              "displayName": "staff_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "n99",
+      "name": "Save Staff Message ID",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1088,
+        704
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a100",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "a101",
+              "name": "action",
+              "value": "new_ticket_alert",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n102",
+      "name": "Alert Posted",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst cfg = $('Config Values').first().json;\nconst p = $('When Called').first().json.payload || {};\nif (!cfg.STAFF_CHAT_ID) throw new Error('Config: STAFF_CHAT_ID is empty');\nconst text = `💬 <b>${esc(p.ticket_id)}</b> · ${esc(p.customer_name)} (${esc(p.channel)}) wrote:\\n` +\n  `\"${esc(String(p.text).slice(0, 1500))}\"\\n\\nReply: <code>/reply ${esc(p.ticket_id)} your message</code>`;\nreturn [{ json: { chat_id: cfg.STAFF_CHAT_ID, text } }];"
+      },
+      "id": "n103",
+      "name": "Format Follow-up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "n104",
+      "name": "Forward to Staff",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        976
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a105",
+              "name": "ok",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "a106",
+              "name": "action",
+              "value": "customer_followup",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n107",
+      "name": "Follow-up Forwarded",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('When Called').first().json.payload || {};\nconst [action, ticket_id] = String(p.data || '').split(':');\nif (!['take', 'resolve'].includes(action) || !ticket_id) throw new Error('Unknown button data: ' + p.data);\nconst staff = p.from_username ? '@' + p.from_username : (p.from_name || 'staff');\nreturn [{ json: { action, ticket_id, staff, callback_query_id: p.callback_query_id,\n  chat_id: p.chat_id, message_id: p.message_id, message_text: p.message_text || '' } }];"
+      },
+      "id": "n108",
+      "name": "Parse Button",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "ticket_id",
+              "lookupValue": "={{ $json.ticket_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n109",
+      "name": "Get Ticket",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        864,
+        1264
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Business rules for buttons: a resolved ticket is closed, and a taken ticket belongs to one person.\nconst cfg = $('Config Values').first().json;\nconst btn = $('Parse Button').first().json;\nconst t = $input.all().map(i => i.json).find(r => r.ticket_id === btn.ticket_id);\nconst now = DateTime.now().setZone(cfg.TIMEZONE);\nconst stamp = now.toFormat('HH:mm');\nif (!t) return [{ json: { ...btn, outcome: 'not_found', toast: `Ticket ${btn.ticket_id} not found` } }];\nif (t.status === 'resolved') return [{ json: { ...btn, ticket: t, outcome: 'already_resolved', toast: `${t.ticket_id} is already resolved` } }];\nif (btn.action === 'take') {\n  if (t.status === 'in_progress' && t.assigned_to && t.assigned_to !== btn.staff)\n    return [{ json: { ...btn, ticket: t, outcome: 'already_taken', toast: `Already taken by ${t.assigned_to}` } }];\n  return [{ json: { ...btn, ticket: t, outcome: 'take', toast: `You took ${t.ticket_id}`,\n    new_text: `${btn.message_text}\\n\\n✋ Taken by ${btn.staff} at ${stamp}`,\n    update: { status: 'in_progress', assigned_to: btn.staff, taken_at: t.taken_at || now.toISO() } } }];\n}\nreturn [{ json: { ...btn, ticket: t, outcome: 'resolve', toast: `${t.ticket_id} resolved`,\n  new_text: `${btn.message_text}\\n\\n✅ Resolved by ${btn.staff} at ${stamp}`,\n  update: { status: 'resolved', assigned_to: t.assigned_to || btn.staff, resolved_at: now.toISO() } } }];"
+      },
+      "id": "n110",
+      "name": "Apply Button Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "queryId": "={{ $json.callback_query_id }}",
+        "additionalFields": {
+          "text": "={{ $json.toast }}"
+        }
+      },
+      "id": "n111",
+      "name": "Answer Button",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1296,
+        1264
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c112",
+                    "leftValue": "={{ $('Apply Button Rules').first().json.outcome }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "take"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Take"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c113",
+                    "leftValue": "={{ $('Apply Button Rules').first().json.outcome }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "resolve"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Resolve"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No Change"
+        }
+      },
+      "id": "n114",
+      "name": "Take or Resolve?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1520,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Apply Button Rules').first().json.ticket_id }}",
+            "status": "in_progress",
+            "assigned_to": "={{ $('Apply Button Rules').first().json.update.assigned_to }}",
+            "taken_at": "={{ $('Apply Button Rules').first().json.update.taken_at }}"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assigned_to",
+              "displayName": "assigned_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "taken_at",
+              "displayName": "taken_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "n115",
+      "name": "Mark Taken",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1760,
+        1152
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $('Apply Button Rules').first().json.chat_id }}",
+        "messageId": "={{ $('Apply Button Rules').first().json.message_id }}",
+        "replyMarkup": "inlineKeyboard",
+        "text": "={{ $('Apply Button Rules').first().json.new_text }}",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Resolve",
+                    "additionalFields": {
+                      "callback_data": "=resolve:{{ $('Apply Button Rules').first().json.ticket_id }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "n116",
+      "name": "Show Taken in Group",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1984,
+        1152
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "send",
+            "payload": "={{ { channel: ($('Apply Button Rules').first().json.ticket.channel), recipient_id: ($('Apply Button Rules').first().json.ticket.channel_user_id), text: ($('Apply Button Rules').first().json.ticket.language === 'ar' ? '✋ أحد أفراد فريق العيادة بيتابع طلبك دلوقتي (' + $('Apply Button Rules').first().json.ticket_id + ') وهيرد عليك هنا.' : '✋ A member of our team is now handling your request (' + $('Apply Button Rules').first().json.ticket_id + ') and will reply here.'), customer_id: ($('Apply Button Rules').first().json.ticket.customer_id), ticket_id: ($('Apply Button Rules').first().json.ticket_id), sender: \"staff\" } }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n117",
+      "name": "Tell Customer: Taken",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2208,
+        1152
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Apply Button Rules').first().json.ticket_id }}",
+            "status": "resolved",
+            "assigned_to": "={{ $('Apply Button Rules').first().json.update.assigned_to }}",
+            "resolved_at": "={{ $('Apply Button Rules').first().json.update.resolved_at }}"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assigned_to",
+              "displayName": "assigned_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "resolved_at",
+              "displayName": "resolved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "n118",
+      "name": "Mark Resolved",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1760,
+        1392
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 887943485,
+          "mode": "id",
+          "cachedResultName": "Customers"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ $('Apply Button Rules').first().json.ticket.customer_id }}",
+            "mode": "ai",
+            "open_ticket_id": ""
+          },
+          "matchingColumns": [
+            "customer_id"
+          ],
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "open_ticket_id",
+              "displayName": "open_ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "n119",
+      "name": "Release Customer to AI",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1984,
+        1392
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "editMessageText",
+        "chatId": "={{ $('Apply Button Rules').first().json.chat_id }}",
+        "messageId": "={{ $('Apply Button Rules').first().json.message_id }}",
+        "text": "={{ $('Apply Button Rules').first().json.new_text }}",
+        "additionalFields": {
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "n120",
+      "name": "Show Resolved in Group",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2208,
+        1392
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "send",
+            "payload": "={{ { channel: ($('Apply Button Rules').first().json.ticket.channel), recipient_id: ($('Apply Button Rules').first().json.ticket.channel_user_id), text: ($('Apply Button Rules').first().json.ticket.language === 'ar' ? '✅ تم إغلاق طلبك (' + $('Apply Button Rules').first().json.ticket_id + '). لو محتاج أي حاجة تانية ابعتلنا في أي وقت.' : '✅ Your request (' + $('Apply Button Rules').first().json.ticket_id + ') has been resolved. Message us anytime if you need anything else.'), customer_id: ($('Apply Button Rules').first().json.ticket.customer_id), ticket_id: ($('Apply Button Rules').first().json.ticket_id), sender: \"staff\" } }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n121",
+      "name": "Tell Customer: Resolved",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2416,
+        1392
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "n122",
+      "name": "Nothing to Change",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('When Called').first().json.payload || {};\nconst text = String(p.text || '').trim();\nconst staff = p.from_username ? '@' + p.from_username : (p.from_name || 'staff');\nconst m = text.match(/^\\/reply(?:@\\w+)?\\s+(T-[A-Za-z0-9-]+)\\s+([\\s\\S]+)$/i);\nif (m) return [{ json: { valid: true, ticket_id: m[1].toUpperCase(), reply: m[2].trim(), staff,\n  chat_id: p.chat_id, message_id: p.message_id } }];\nreturn [{ json: { valid: false, chat_id: p.chat_id, message_id: p.message_id,\n  help: 'Usage: /reply T-261029-AB12 Your message to the customer' } }];"
+      },
+      "id": "n123",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c124",
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n125",
+      "name": "Valid Command?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        864,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.help }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "reply_to_message_id": "={{ $json.message_id }}"
+        }
+      },
+      "id": "n126",
+      "name": "Send Usage Help",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        2112
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "ticket_id",
+              "lookupValue": "={{ $json.ticket_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n127",
+      "name": "Find Ticket",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1088,
+        1936
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const cmd = $('Parse Command').first().json;\nconst t = $input.all().map(i => i.json).find(r => r.ticket_id === cmd.ticket_id);\nif (!t) return [{ json: { ...cmd, ok: false, reason: `Ticket ${cmd.ticket_id} not found.` } }];\nif (t.status === 'resolved') return [{ json: { ...cmd, ok: false, reason: `${t.ticket_id} is already resolved. The customer is back with the AI assistant.` } }];\nreturn [{ json: { ...cmd, ok: true, ticket: t } }];"
+      },
+      "id": "n128",
+      "name": "Check Ticket",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c129",
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n130",
+      "name": "Can Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1520,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "=⚠️ {{ $json.reason }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "reply_to_message_id": "={{ $json.message_id }}"
+        }
+      },
+      "id": "n131",
+      "name": "Reply Rejected",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        2064
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "send",
+            "payload": "={{ { channel: ($('Check Ticket').first().json.ticket.channel), recipient_id: ($('Check Ticket').first().json.ticket.channel_user_id), text: ($('Check Ticket').first().json.reply), customer_id: ($('Check Ticket').first().json.ticket.customer_id), ticket_id: ($('Check Ticket').first().json.ticket_id), sender: \"staff\" } }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n132",
+      "name": "Send Staff Reply",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1760,
+        1872
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c133",
+              "leftValue": "={{ $json.status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "sent"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n134",
+      "name": "Delivered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1984,
+        1872
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Check Ticket').first().json.ticket_id }}",
+            "status": "in_progress",
+            "assigned_to": "={{ $('Check Ticket').first().json.ticket.assigned_to || $('Check Ticket').first().json.staff }}",
+            "taken_at": "={{ $('Check Ticket').first().json.ticket.taken_at || $now.toISO() }}",
+            "first_response_at": "={{ $('Check Ticket').first().json.ticket.first_response_at || $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "assigned_to",
+              "displayName": "assigned_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "taken_at",
+              "displayName": "taken_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "first_response_at",
+              "displayName": "first_response_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "n135",
+      "name": "Record First Response",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2208,
+        1792
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 479665879,
+          "mode": "id",
+          "cachedResultName": "Conversations"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "message_id": "={{ $('Send Staff Reply').first().json.provider_message_id }}",
+            "customer_id": "={{ $('Check Ticket').first().json.ticket.customer_id }}",
+            "channel": "={{ $('Check Ticket').first().json.ticket.channel }}",
+            "direction": "out",
+            "sender": "staff",
+            "text": "={{ $('Check Ticket').first().json.reply }}",
+            "route": "human",
+            "ticket_id": "={{ $('Check Ticket').first().json.ticket_id }}",
+            "delivery_status": "sent"
+          },
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "direction",
+              "displayName": "direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sender",
+              "displayName": "sender",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "route",
+              "displayName": "route",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "delivery_status",
+              "displayName": "delivery_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "useAppend": true
+        }
+      },
+      "id": "n136",
+      "name": "Log Staff Reply",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2416,
+        1792
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Check Ticket').first().json.chat_id }}",
+        "text": "=✅ Sent to {{ $('Check Ticket').first().json.ticket.customer_name }} via {{ $('Check Ticket').first().json.ticket.channel }} ({{ $('Check Ticket').first().json.ticket_id }})",
+        "additionalFields": {
+          "appendAttribution": false,
+          "reply_to_message_id": "={{ $('Check Ticket').first().json.message_id }}"
+        }
+      },
+      "id": "n137",
+      "name": "Confirm to Staff",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2640,
+        1792
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Check Ticket').first().json.chat_id }}",
+        "text": "=❌ Could not deliver to {{ $('Check Ticket').first().json.ticket.channel }}: {{ $json.error || 'unknown error' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "reply_to_message_id": "={{ $('Check Ticket').first().json.message_id }}"
+        }
+      },
+      "id": "n138",
+      "name": "Delivery Failed Notice",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2208,
+        1968
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Guard the send step: every channel has its own limits and required IDs.\nconst cfg = $('Config Values').first().json;\nconst m = $('When Called').first().json.payload || {};\nconst limits = { telegram: 4000, whatsapp: 4000, messenger: 1900, instagram: 1000, test: 4000 };\nconst channel = String(m.channel || '').toLowerCase().trim();\nif (!limits[channel]) throw new Error(`Router: unsupported channel \"${channel}\"`);\nif (!m.recipient_id) throw new Error('Router: missing recipient_id');\nlet text = String(m.text || '').trim();\nif (!text) throw new Error('Router: empty text');\nif (channel === 'whatsapp' && !cfg.WA_PHONE_NUMBER_ID) throw new Error('Config: WA_PHONE_NUMBER_ID is empty');\nif (channel === 'instagram') {\n  // Instagram counts bytes, and Arabic letters take 2 bytes each\n  while (Buffer.byteLength(text, 'utf8') > 990) text = text.slice(0, -5);\n} else if (text.length > limits[channel]) {\n  text = text.slice(0, limits[channel] - 1) + '…';\n}\nreturn [{ json: {\n  channel, recipient_id: String(m.recipient_id), text,\n  customer_id: m.customer_id || '', ticket_id: m.ticket_id || '', sender: m.sender || 'ai',\n  graph: cfg.GRAPH_VERSION, wa_phone_id: cfg.WA_PHONE_NUMBER_ID,\n}}];"
+      },
+      "id": "95c93bbf-3793-4943-9ff6-09df7d5b7e37",
+      "name": "Validate Outbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b1073cc4-d52e-46f7-b3e4-f94dba0b3ae4",
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "telegram"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Telegram"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0960cc9d-8fb8-4f90-bd50-b719f886a7cb",
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "whatsapp"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "WhatsApp"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a71bcb16-afd4-43d5-b55d-60c7bd18f790",
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "messenger"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Messenger"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a88c4816-140f-45eb-83a5-d7131b20c1cc",
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "instagram"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Instagram"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "68fd38f0-fa91-4418-8acf-dc4682b357c2",
+                    "leftValue": "={{ $json.channel }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "test"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Test"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "4ec69f35-ed6a-4a52-9156-691e0b3b5e60",
+      "name": "Route by Channel",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.recipient_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "7d13dbbe-a109-4b0b-a0ee-220809ee71d9",
+      "name": "Send via Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1536,
+        2560
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $json.wa_phone_id }}",
+        "recipientPhoneNumber": "={{ $json.recipient_id }}",
+        "textBody": "={{ $json.text }}",
+        "additionalFields": {
+          "previewUrl": false
+        }
+      },
+      "id": "52e916f7-d9cb-4e16-abfc-8ea0cf7df9de",
+      "name": "Send via WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        2736
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/{{ $json.graph }}/me/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.recipient_id }, messaging_type: 'RESPONSE', message: { text: $json.text } }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "f0bab46c-c58e-44df-86af-d1d5d30b82f6",
+      "name": "Send via Messenger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1536,
+        2928
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/{{ $json.graph }}/me/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.recipient_id }, message: { text: $json.text } }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "9119bd07-fefb-4d63-af35-1c9e9a29ecd7",
+      "name": "Send via Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1536,
+        3104
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "45bfd890-f494-4861-b162-a29b0ac50239",
+              "name": "message_id",
+              "value": "={{ 'test-' + $now.toMillis() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e8ea54d2-b97c-4674-8342-a22312aafc3e",
+      "name": "Simulate Send (Test)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1536,
+        3280
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a02b2ccb-d1d5-48c8-a03f-dfc420be24b4",
+              "name": "status",
+              "value": "sent",
+              "type": "string"
+            },
+            {
+              "id": "f2e79506-a5ae-4eed-a847-63e2d35e9274",
+              "name": "channel",
+              "value": "={{ $('Validate Outbound').first().json.channel }}",
+              "type": "string"
+            },
+            {
+              "id": "769cc726-1a11-4755-84bd-b63d864e27b9",
+              "name": "provider_message_id",
+              "value": "={{ String($json.result?.message_id ?? $json.message_id ?? $json.messages?.[0]?.id ?? '') }}",
+              "type": "string"
+            },
+            {
+              "id": "473ad8c4-5327-46c9-8b87-70d648151096",
+              "name": "error",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "1567115c-5999-4920-a8ad-467a2879d31f",
+              "name": "sent_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "70b36452-1744-44ac-80df-727a8622d409",
+      "name": "Delivered",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1840,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// All four send nodes share this error branch. Turn the raw error into one readable line.\nconst out = $('Validate Outbound').first().json;\nconst e = $json.error || {};\nconst detail = e.description || e.message || (typeof e === 'string' ? e : JSON.stringify(e));\nlet hint = '';\nif (/131047|re-engage|24 hour|outside.*window/i.test(detail)) hint = ' (customer is outside the 24-hour messaging window)';\nif (/131030|not in allowed list|recipient phone number not/i.test(detail)) hint = ' (add this number to the test recipients list in Meta)';\nif (/OAuth|access token|190/i.test(detail)) hint = ' (token expired or invalid: update the Meta credential)';\nreturn [{ json: {\n  status: 'failed', channel: out.channel, provider_message_id: '',\n  error: String(detail).slice(0, 400) + hint, sent_at: $now.toISO(),\n}}];"
+      },
+      "id": "495f8913-03d7-408d-a586-388853ed11a0",
+      "name": "Describe Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        3088
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 4 · Ops & Monitoring"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow": "NSD 3 · Delivery & Staff Desk",
+            "node": "=Send via {{ $json.channel }}",
+            "message": "=Delivery failed to {{ $json.channel }} user {{ $('Validate Outbound').first().json.recipient_id }}: {{ $json.error }}",
+            "severity": "error",
+            "error_type": "",
+            "context": "={{ { ticket_id: $('Validate Outbound').first().json.ticket_id, customer_id: $('Validate Outbound').first().json.customer_id } }}"
+          },
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false,
+          "schema": [
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "node",
+              "displayName": "node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_type",
+              "displayName": "error_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "0bb2df2a-a22f-4fd3-9caa-0768f1cbdefa",
+      "name": "Report Delivery Error",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2064,
+        3088
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "277772ad-34ff-40f9-b8a5-229b9a74ee5e",
+              "name": "status",
+              "value": "failed",
+              "type": "string"
+            },
+            {
+              "id": "4550f424-5f90-4aa4-9364-db26f25175af",
+              "name": "channel",
+              "value": "={{ $('Describe Failure').first().json.channel }}",
+              "type": "string"
+            },
+            {
+              "id": "df303bb1-82e9-4f88-b466-685c6a20f2ac",
+              "name": "provider_message_id",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "5e997f0c-5e10-4324-b978-d8945199dec6",
+              "name": "error",
+              "value": "={{ $('Describe Failure').first().json.error }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a8a9288d-675a-4c60-911a-c35e256c9b07",
+      "name": "Return Failure",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2288,
+        3088
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0744c921-c699-41d5-9043-dfbe624e4951",
+              "name": "CLINIC_NAME",
+              "value": "Nile Smile Dental",
+              "type": "string"
+            },
+            {
+              "id": "347a83b7-4db1-407e-81bc-4ba0d5527be1",
+              "name": "TIMEZONE",
+              "value": "Africa/Cairo",
+              "type": "string"
+            },
+            {
+              "id": "0b6ad534-89f9-420b-a36a-71c53baae47b",
+              "name": "STAFF_CHAT_ID",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "f4d65cb4-1aa4-4bad-8ae4-3bc2155da7d7",
+              "name": "ADMIN_CHAT_ID",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "918df768-baf2-41e4-b4d8-51bd1895994c",
+              "name": "ADMIN_EMAIL",
+              "value": "you@example.com",
+              "type": "string"
+            },
+            {
+              "id": "37f57b44-ecd1-46b2-bbf1-7f67c9182ac7",
+              "name": "OPEN_HOUR",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "4f2a1a1c-260f-4f5b-a048-f7ab997e3bbe",
+              "name": "LAST_SLOT",
+              "value": "21:30",
+              "type": "string"
+            },
+            {
+              "id": "eddbdc89-e40c-4761-8e00-8fb6ce604ace",
+              "name": "SLOT_MINUTES",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "3c107358-1cf6-4deb-8f08-b0421cedb2b8",
+              "name": "CLOSED_WEEKDAYS",
+              "value": "5",
+              "type": "string"
+            },
+            {
+              "id": "e54467f5-abdd-40cb-89bf-81580bcee931",
+              "name": "MAX_DAYS_AHEAD",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "0fc373dc-0579-4c92-9322-03c8f459fad6",
+              "name": "HISTORY_TURNS",
+              "value": 6,
+              "type": "number"
+            },
+            {
+              "id": "154e8f2d-985a-4864-aedc-d3251d4d1b92",
+              "name": "SLA_URGENT_MIN",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "b8e6db1d-5a93-4436-bc51-efe29d9e7edf",
+              "name": "SLA_HIGH_MIN",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "e0f996ad-8cdb-47bf-b727-946945ae779d",
+              "name": "SLA_NORMAL_MIN",
+              "value": 120,
+              "type": "number"
+            },
+            {
+              "id": "998782c5-671c-4948-a882-02ff4ed46270",
+              "name": "REESCALATE_MIN",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "98566b5a-7666-4f0f-ba63-f0238d2bc4a8",
+              "name": "ALERT_THROTTLE_MIN",
+              "value": 15,
+              "type": "number"
+            },
+            {
+              "id": "09b1ae12-94df-43d8-afb6-b97f20e6c376",
+              "name": "META_VERIFY_TOKEN",
+              "value": "nsd_verify_7f3k9q2m",
+              "type": "string"
+            },
+            {
+              "id": "4daf2510-b14a-45a5-816f-ebd63e5954e0",
+              "name": "GRAPH_VERSION",
+              "value": "v26.0",
+              "type": "string"
+            },
+            {
+              "id": "a3262cb1-be6e-4008-96c4-bccf8f50883f",
+              "name": "WA_PHONE_NUMBER_ID",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "94481764-43b9-477e-9533-908588ec12d3",
+              "name": "PUBLIC_BASE_URL",
+              "value": "https://zesty-charting-overflow.ngrok-free.dev",
+              "type": "string"
+            },
+            {
+              "id": "1343067c-907c-4cb5-a362-f2aecd4690f9",
+              "name": "EDITOR_URL",
+              "value": "http://127.0.0.1:5679",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "179b02e5-ee0c-4761-b372-b1f91cecdb2d",
+      "name": "Config Values",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        160,
+        1312
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {},
+      "id": "return-config",
+      "name": "Return Config",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        640,
+        448
+      ]
+    }
+  ],
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Config Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Action": {
+      "main": [
+        [
+          {
+            "node": "Return Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Outbound",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Ticket Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Button",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse Command",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Ticket Alert": {
+      "main": [
+        [
+          {
+            "node": "Post Ticket to Staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Ticket to Staff": {
+      "main": [
+        [
+          {
+            "node": "Save Staff Message ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Staff Message ID": {
+      "main": [
+        [
+          {
+            "node": "Alert Posted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Forward to Staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward to Staff": {
+      "main": [
+        [
+          {
+            "node": "Follow-up Forwarded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Button": {
+      "main": [
+        [
+          {
+            "node": "Get Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Ticket": {
+      "main": [
+        [
+          {
+            "node": "Apply Button Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Button Rules": {
+      "main": [
+        [
+          {
+            "node": "Answer Button",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Button": {
+      "main": [
+        [
+          {
+            "node": "Take or Resolve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Taken": {
+      "main": [
+        [
+          {
+            "node": "Show Taken in Group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Show Taken in Group": {
+      "main": [
+        [
+          {
+            "node": "Tell Customer: Taken",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take or Resolve?": {
+      "main": [
+        [
+          {
+            "node": "Mark Taken",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Resolved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nothing to Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Resolved": {
+      "main": [
+        [
+          {
+            "node": "Release Customer to AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Customer to AI": {
+      "main": [
+        [
+          {
+            "node": "Show Resolved in Group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Show Resolved in Group": {
+      "main": [
+        [
+          {
+            "node": "Tell Customer: Resolved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [
+          {
+            "node": "Valid Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Command?": {
+      "main": [
+        [
+          {
+            "node": "Find Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Usage Help",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Ticket": {
+      "main": [
+        [
+          {
+            "node": "Check Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ticket": {
+      "main": [
+        [
+          {
+            "node": "Can Reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Reply?": {
+      "main": [
+        [
+          {
+            "node": "Send Staff Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Staff Reply": {
+      "main": [
+        [
+          {
+            "node": "Delivered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delivered?": {
+      "main": [
+        [
+          {
+            "node": "Record First Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delivery Failed Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record First Response": {
+      "main": [
+        [
+          {
+            "node": "Log Staff Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Staff Reply": {
+      "main": [
+        [
+          {
+            "node": "Confirm to Staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Outbound": {
+      "main": [
+        [
+          {
+            "node": "Route by Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Channel": {
+      "main": [
+        [
+          {
+            "node": "Send via Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send via WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send via Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send via Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Simulate Send (Test)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Telegram": {
+      "main": [
+        [
+          {
+            "node": "Delivered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Delivered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Messenger": {
+      "main": [
+        [
+          {
+            "node": "Delivered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Instagram": {
+      "main": [
+        [
+          {
+            "node": "Delivered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Describe Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate Send (Test)": {
+      "main": [
+        [
+          {
+            "node": "Delivered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Describe Failure": {
+      "main": [
+        [
+          {
+            "node": "Report Delivery Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Delivery Error": {
+      "main": [
+        [
+          {
+            "node": "Return Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Values": {
+      "main": [
+        [
+          {
+            "node": "Route by Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Cairo"
+  }
+}

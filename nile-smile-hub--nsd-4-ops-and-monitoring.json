@@ -1,0 +1,2312 @@
+{
+  "name": "NSD 4 · Ops & Monitoring",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "n24",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "workflow"
+            },
+            {
+              "name": "node"
+            },
+            {
+              "name": "message"
+            },
+            {
+              "name": "severity"
+            },
+            {
+              "name": "error_type"
+            },
+            {
+              "name": "context",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "n25",
+      "name": "Report Handled Error",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "config",
+            "payload": "={{ {} }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n26",
+      "name": "Get Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One pipeline for three sources: crashed executions, errors reported on purpose, and failed heartbeats.\nconst cfg = $('Get Config').first().json;\nlet e;\nif ($('Error Trigger').isExecuted) {\n  const d = $('Error Trigger').first().json;\n  e = { workflow: d.workflow?.name || 'unknown', node: d.execution?.lastNodeExecuted || d.execution?.error?.node?.name || '',\n    message: d.execution?.error?.message || d.trigger?.error?.message || 'Unknown error',\n    execution_id: d.execution?.id || '', execution_url: d.execution?.url || '', severity: '', error_type: '' };\n} else if ($('Report Handled Error').isExecuted) {\n  const d = $('Report Handled Error').first().json;\n  e = { workflow: d.workflow, node: d.node, message: d.message, execution_id: '', execution_url: '',\n    severity: d.severity || '', error_type: d.error_type || '' };\n} else {\n  e = { ...$('Heartbeat Failed').first().json };\n}\nconst msg = String(e.message || '');\nconst rules = [\n  ['auth', 'critical', /401|403|unauthori[sz]ed|invalid.*token|access token|oauth|credential|permission/i],\n  ['rate_limit', 'warning', /429|rate.?limit|quota|too many requests/i],\n  ['network', 'warning', /ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|timeout|socket hang up|50[234]/i],\n  ['ai_output', 'warning', /parse|json|output parser|schema|could not.*format/i],\n  ['config', 'critical', /^Config:|is empty/i],\n  ['validation', 'info', /^Invalid input|^Router: (empty|missing)/i],\n  ['delivery', 'error', /Delivery failed/i],\n  ['google_api', 'error', /google|sheets|spreadsheet|drive/i],\n  ['messaging_api', 'error', /telegram|graph\\.facebook|graph\\.instagram|whatsapp/i],\n];\nlet type = e.error_type, severity = e.severity;\nif (!type) { const hit = rules.find(([, , re]) => re.test(msg)); type = hit ? hit[0] : 'unknown'; if (!severity) severity = hit ? hit[1] : 'error'; }\nif (!severity) severity = 'error';\nconst now = DateTime.now().setZone(cfg.TIMEZONE);\nreturn [{ json: {\n  timestamp: now.toISO(),\n  error_id: `E-${now.toFormat('yyMMddHHmmss')}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`,\n  workflow: e.workflow, node: e.node, error_type: type, severity, message: msg.slice(0, 500),\n  execution_id: String(e.execution_id || ''), execution_url: e.execution_url || '',\n  fingerprint: `${e.workflow}|${e.node}|${type}`,\n}}];"
+      },
+      "id": "n27",
+      "name": "Classify Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 645554878,
+          "mode": "id",
+          "cachedResultName": "Error Log"
+        },
+        "options": {},
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "fingerprint",
+              "lookupValue": "={{ $json.fingerprint }}"
+            }
+          ]
+        }
+      },
+      "id": "n28",
+      "name": "Recent Same Errors",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        700,
+        300
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Alert storms help nobody: one alert per fingerprint per ALERT_THROTTLE_MIN minutes.\nconst cfg = $('Get Config').first().json;\nconst e = $('Classify Error').first().json;\nconst win = Number(cfg.ALERT_THROTTLE_MIN) || 15;\nconst now = DateTime.fromISO(e.timestamp);\nconst recent = $input.all().map(i => i.json).filter(r => r.fingerprint === e.fingerprint && r.alerted === 'yes'\n  && now.diff(DateTime.fromISO(String(r.timestamp)), 'minutes').minutes < win);\nconst alerted = e.severity === 'info' ? 'no' : recent.length ? 'suppressed' : 'yes';\nreturn [{ json: { ...e, alerted } }];"
+      },
+      "id": "n29",
+      "name": "Throttle Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 645554878,
+          "mode": "id",
+          "cachedResultName": "Error Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "error_id": "={{ $json.error_id }}",
+            "workflow": "={{ $json.workflow }}",
+            "node": "={{ $json.node }}",
+            "error_type": "={{ $json.error_type }}",
+            "severity": "={{ $json.severity }}",
+            "message": "={{ $json.message }}",
+            "execution_id": "={{ $json.execution_id }}",
+            "execution_url": "={{ $json.execution_url }}",
+            "fingerprint": "={{ $json.fingerprint }}",
+            "alerted": "={{ $json.alerted }}"
+          },
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_id",
+              "displayName": "error_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "node",
+              "displayName": "node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_type",
+              "displayName": "error_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "execution_url",
+              "displayName": "execution_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fingerprint",
+              "displayName": "fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "alerted",
+              "displayName": "alerted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW",
+          "useAppend": true
+        }
+      },
+      "id": "n30",
+      "name": "Write Error Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1140,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c31",
+              "leftValue": "={{ $('Throttle Check').first().json.alerted }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "yes"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n32",
+      "name": "Send Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst cfg = $('Get Config').first().json;\nconst e = $('Throttle Check').first().json;\nconst icon = { critical: '🛑', error: '❗', warning: '⚠️' }[e.severity] || '❗';\nconst link = e.execution_url ? `\\n🔗 ${esc(e.execution_url)}` : '';\nreturn [{ json: { ...e, chat_id: cfg.ADMIN_CHAT_ID || cfg.STAFF_CHAT_ID, admin_email: cfg.ADMIN_EMAIL,\n  text: `${icon} <b>${esc(e.severity.toUpperCase())} · ${esc(e.error_type)}</b>\\n${esc(e.workflow)} → ${esc(e.node)}\\n${esc(e.message)}\\n🆔 ${esc(e.error_id)}${link}\\n(similar alerts muted for ${cfg.ALERT_THROTTLE_MIN} min)` } }];"
+      },
+      "id": "n33",
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "n34",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1800,
+        220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c35",
+              "leftValue": "={{ $('Format Alert').first().json.severity }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "critical"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n36",
+      "name": "Critical?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2020,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Format Alert').first().json.admin_email }}",
+        "subject": "=[Nile Smile] CRITICAL: {{ $('Format Alert').first().json.error_type }} in {{ $('Format Alert').first().json.workflow }}",
+        "emailType": "html",
+        "message": "=<p><b>{{ $('Format Alert').first().json.workflow }}</b> → {{ $('Format Alert').first().json.node }}</p><p>{{ $('Format Alert').first().json.message }}</p><p>Error ID: {{ $('Format Alert').first().json.error_id }}<br>Execution: {{ $('Format Alert').first().json.execution_url || 'n/a' }}</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "n37",
+      "name": "Email Critical Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2240,
+        160
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 7
+            }
+          ]
+        }
+      },
+      "id": "n38",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "config",
+            "payload": "={{ {} }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n39",
+      "name": "Get Config (Heartbeat)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Get Config (Heartbeat)').first().json.PUBLIC_BASE_URL }}/healthz",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "ngrok-YOUR_KEY",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "n40",
+      "name": "Ping Public URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        440,
+        700
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Proves the full public path works: internet → ngrok → Docker → n8n.\nconst r = $json;\nconst body = typeof r.body === 'string' ? (() => { try { return JSON.parse(r.body); } catch { return {}; } })() : (r.body || {});\nconst healthy = r.statusCode === 200 && body.status === 'ok';\nreturn [{ json: { healthy, status: r.statusCode ?? 'no response', detail: r.error?.message || JSON.stringify(body).slice(0, 120) } }];"
+      },
+      "id": "n41",
+      "name": "Evaluate Health",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c42",
+              "leftValue": "={{ $json.healthy }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n43",
+      "name": "Healthy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        700
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n44",
+      "name": "All Good",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a45",
+              "name": "workflow",
+              "value": "NSD 4 · Ops & Monitoring",
+              "type": "string"
+            },
+            {
+              "id": "a46",
+              "name": "node",
+              "value": "Ping Public URL",
+              "type": "string"
+            },
+            {
+              "id": "a47",
+              "name": "message",
+              "value": "=Public webhook URL is unreachable (status {{ $json.status }}: {{ $json.detail }}). Check Docker and ngrok.",
+              "type": "string"
+            },
+            {
+              "id": "a48",
+              "name": "severity",
+              "value": "critical",
+              "type": "string"
+            },
+            {
+              "id": "a49",
+              "name": "error_type",
+              "value": "heartbeat",
+              "type": "string"
+            },
+            {
+              "id": "a50",
+              "name": "execution_id",
+              "value": "={{ $execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a51",
+              "name": "execution_url",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n52",
+      "name": "Heartbeat Failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15 21 * * *"
+            }
+          ]
+        }
+      },
+      "id": "n53",
+      "name": "Every Day 21:15",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "config",
+            "payload": "={{ {} }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n54",
+      "name": "Get Config (Digest)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 645554878,
+          "mode": "id",
+          "cachedResultName": "Error Log"
+        },
+        "options": {}
+      },
+      "id": "n55",
+      "name": "Read Error Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        1000
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "options": {}
+      },
+      "id": "n56",
+      "name": "Read All Tickets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        660,
+        1000
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 479665879,
+          "mode": "id",
+          "cachedResultName": "Conversations"
+        },
+        "options": {}
+      },
+      "id": "n57",
+      "name": "Read Conversations",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        880,
+        1000
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Get Config (Digest)').first().json;\nconst now = DateTime.now().setZone(cfg.TIMEZONE);\nconst since = now.minus({ hours: 24 });\nconst recent = (rows, field) => rows.map(i => i.json).filter(r => { const d = DateTime.fromISO(String(r[field] || '')); return d.isValid && d >= since; });\nconst errors = recent($('Read Error Log').all(), 'timestamp');\nconst allTickets = $('Read All Tickets').all().map(i => i.json).filter(r => r.ticket_id && r.channel !== 'test');\nconst newTickets = recent($('Read All Tickets').all(), 'created_at').filter(r => r.channel !== 'test');\nconst msgs = recent($('Read Conversations').all(), 'timestamp').filter(r => r.channel !== 'test');\nconst count = (rows, key) => rows.reduce((a, r) => (a[r[key] || 'n/a'] = (a[r[key] || 'n/a'] || 0) + 1, a), {});\nconst fmt = o => Object.entries(o).map(([k, v]) => `${k}: ${v}`).join(', ') || 'none';\nconst inbound = msgs.filter(r => r.direction === 'in');\nconst open = allTickets.filter(r => r.status !== 'resolved');\nconst breached = allTickets.filter(r => Number(r.escalation_count) > 0 && r.status !== 'resolved');\nconst stats = {\n  messages_in: inbound.length, by_channel: fmt(count(inbound, 'channel')), by_route: fmt(count(inbound, 'route')),\n  new_tickets: newTickets.length, open_tickets: open.length, sla_breached_open: breached.length,\n  errors: errors.length, errors_by_type: fmt(count(errors, 'error_type')),\n  critical: errors.filter(r => r.severity === 'critical').length,\n};\nconst row = (k, v) => `<tr><td style=\"padding:4px 12px 4px 0;color:#555\">${k}</td><td style=\"padding:4px 0\"><b>${v}</b></td></tr>`;\nconst html = `<h2 style=\"font-family:sans-serif\">Nile Smile support digest · ${now.toFormat('d LLL yyyy')}</h2>\n<table style=\"font-family:sans-serif;font-size:14px\">${row('Customer messages (24h)', stats.messages_in)}${row('By channel', stats.by_channel)}${row('By route', stats.by_route)}${row('New tickets', stats.new_tickets)}${row('Open tickets', stats.open_tickets)}${row('Open with SLA breach', stats.sla_breached_open)}${row('Errors (24h)', stats.errors)}${row('Errors by type', stats.errors_by_type)}${row('Critical errors', stats.critical)}</table>\n<p style=\"font-family:sans-serif;font-size:12px;color:#888\">Sent by NSD 4 · Ops & Monitoring. Test traffic excluded.</p>`;\nconst text = `📊 Daily digest ${now.toFormat('d LLL')}\\nMessages: ${stats.messages_in} (${stats.by_channel})\\nNew tickets: ${stats.new_tickets} · Open: ${stats.open_tickets} · SLA breached: ${stats.sla_breached_open}\\nErrors: ${stats.errors} (${stats.errors_by_type})`;\nreturn [{ json: { ...stats, html, text, chat_id: cfg.ADMIN_CHAT_ID || cfg.STAFF_CHAT_ID, email: cfg.ADMIN_EMAIL, subject: `[Nile Smile] Daily support digest · ${now.toFormat('d LLL yyyy')}` } }];"
+      },
+      "id": "n58",
+      "name": "Build Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "n59",
+      "name": "Email Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        1000
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Build Digest').first().json.chat_id }}",
+        "text": "={{ $('Build Digest').first().json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "n60",
+      "name": "Post Digest to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        1000
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "n278",
+      "name": "Every 10 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        1650
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 3 · Delivery & Staff Desk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "action": "config",
+            "payload": "={{ {} }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n279",
+      "name": "Get Config (SLA)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        1650
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "options": {}
+      },
+      "id": "n280",
+      "name": "Read Tickets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        1650
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// A breach = an open ticket nobody took before its SLA, or a taken ticket with no reply after 2x the SLA.\n// We re-alert at most every REESCALATE_MIN minutes per ticket.\nconst cfg = $('Get Config (SLA)').first().json;\nconst now = DateTime.now().setZone(cfg.TIMEZONE);\nconst gap = Number(cfg.REESCALATE_MIN) || 30;\nconst out = [];\nfor (const t of $input.all().map(i => i.json)) {\n  if (!t.ticket_id || !['open', 'in_progress'].includes(t.status) || t.channel === 'test') continue;\n  const created = DateTime.fromISO(String(t.created_at));\n  const due = DateTime.fromISO(String(t.sla_due_at));\n  if (!created.isValid || !due.isValid) continue;\n  const notTaken = t.status === 'open' && now > due;\n  const noReply = t.status === 'in_progress' && !t.first_response_at && now > due.plus(due.diff(created));\n  if (!notTaken && !noReply) continue;\n  const last = t.last_escalated_at ? DateTime.fromISO(String(t.last_escalated_at)) : null;\n  if (last?.isValid && now.diff(last, 'minutes').minutes < gap) continue;\n  const level = (Number(t.escalation_count) || 0) + 1;\n  out.push({ json: { ...t, level, overdue_min: Math.round(now.diff(due, 'minutes').minutes),\n    problem: notTaken ? 'Not taken yet' : `Taken by ${t.assigned_to} but no reply yet`,\n    email_manager: level >= 2 || t.priority === 'urgent', now: now.toISO() } });\n}\nreturn out;"
+      },
+      "id": "n281",
+      "name": "Find SLA Breaches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        1650
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "n282",
+      "name": "Loop Over Breaches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        1650
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst cfg = $('Get Config (SLA)').first().json;\nconst t = $json;\nconst text = `⏰ <b>SLA breach · level ${t.level}</b>\\n<b>${esc(t.ticket_id)}</b> · ${esc(t.priority)} · ${esc(t.type)}\\n` +\n  `👤 ${esc(t.customer_name)} (${esc(t.channel)})\\n${esc(t.problem)}, overdue by ${t.overdue_min} min.\\n\\n` +\n  `📝 ${esc(t.summary)}\\n\\nReply: <code>/reply ${esc(t.ticket_id)} your message</code>`;\nreturn [{ json: { ...t, chat_id: cfg.STAFF_CHAT_ID, alert_text: text } }];"
+      },
+      "id": "n283",
+      "name": "Format Escalation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        1550
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.alert_text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        },
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✋ Take",
+                    "additionalFields": {
+                      "callback_data": "=take:{{ $json.ticket_id }}"
+                    }
+                  },
+                  {
+                    "text": "✅ Resolve",
+                    "additionalFields": {
+                      "callback_data": "=resolve:{{ $json.ticket_id }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "n284",
+      "name": "Alert Staff Group",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        1550
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c285",
+              "leftValue": "={{ $('Format Escalation').item.json.email_manager }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "n286",
+      "name": "Email Manager?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1540,
+        1550
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Get Config (SLA)').first().json.ADMIN_EMAIL }}",
+        "subject": "=[Nile Smile] SLA breach level {{ $('Format Escalation').item.json.level }}: {{ $('Format Escalation').item.json.ticket_id }}",
+        "emailType": "html",
+        "message": "=<p><b>{{ $('Format Escalation').item.json.ticket_id }}</b> ({{ $('Format Escalation').item.json.priority }}, {{ $('Format Escalation').item.json.type }}) is overdue by {{ $('Format Escalation').item.json.overdue_min }} minutes.</p><p>Customer: {{ $('Format Escalation').item.json.customer_name }} via {{ $('Format Escalation').item.json.channel }}<br>Problem: {{ $('Format Escalation').item.json.problem }}<br>Summary: {{ $('Format Escalation').item.json.summary }}</p><p>Handle it in the Telegram staff group.</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "n287",
+      "name": "Email Clinic Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        1470
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 754421829,
+          "mode": "id",
+          "cachedResultName": "Tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Format Escalation').item.json.ticket_id }}",
+            "escalation_count": "={{ $('Format Escalation').item.json.level }}",
+            "last_escalated_at": "={{ $('Format Escalation').item.json.now }}"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "escalation_count",
+              "displayName": "escalation_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_escalated_at",
+              "displayName": "last_escalated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "n288",
+      "name": "Record Escalation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1980,
+        1650
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {},
+      "id": "n289",
+      "name": "All Breaches Handled",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        1810
+      ]
+    },
+    {
+      "parameters": {
+        "events": [
+          "init"
+        ]
+      },
+      "id": "n269",
+      "name": "When n8n Starts",
+      "type": "n8n-nodes-base.n8nTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        2160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "n270",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        2320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id",
+          "cachedResultName": "NSD Knowledge Base"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "text/plain"
+            }
+          }
+        }
+      },
+      "id": "n271",
+      "name": "Get KB Document",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        260,
+        2160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// The Drive node exported the Google Doc as plain text into a binary file. Read it as a string.\n// Refuse to wipe a working knowledge base with an empty or broken document.\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst content = buffer.toString('utf8').replace(/^\\uFEFF/, '');\nif (content.trim().length < 200) throw new Error(`KB document looks empty (${content.length} chars). Store not updated.`);\nreturn [{ json: { content, chars: content.length, loaded_at: $now.toISO() } }];"
+      },
+      "id": "n272",
+      "name": "Check Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        2160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "value": "nsd_kb",
+          "mode": "id"
+        },
+        "clearStore": true,
+        "embeddingBatchSize": 50
+      },
+      "id": "n273",
+      "name": "Store in Vector Memory",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        2160
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "id": "n274",
+      "name": "Gemini Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        640,
+        2380
+      ]
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.content }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "NSD Knowledge Base"
+              }
+            ]
+          }
+        }
+      },
+      "id": "n275",
+      "name": "KB Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        2380
+      ]
+    },
+    {
+      "parameters": {
+        "chunkSize": 900,
+        "chunkOverlap": 150,
+        "options": {}
+      },
+      "id": "n276",
+      "name": "Split by Paragraphs",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        880,
+        2580
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { chunks_stored: $input.all().length, chars: $('Check Content').first().json.chars,\n  memory_key: 'nsd_kb', loaded_at: $('Check Content').first().json.loaded_at } }];"
+      },
+      "id": "n277",
+      "name": "Ingest Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        2160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n290",
+      "name": "Run Tests",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        3000
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 534616513,
+          "mode": "id",
+          "cachedResultName": "Untitled"
+        },
+        "options": {}
+      },
+      "id": "n291",
+      "name": "Read Test Messages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        220,
+        3000
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Each run uses fresh fake customers so earlier runs (human mode, history) cannot affect results.\nconst run = 'run' + DateTime.now().toFormat('MMddHHmm');\nreturn $input.all().filter(i => i.json.test_id && i.json.message).map(i => ({ json: { ...i.json, run_id: run } }));"
+      },
+      "id": "n292",
+      "name": "Prepare Test Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        3000
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "n293",
+      "name": "Loop Over Tests",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        3000
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "list",
+          "cachedResultName": "NSD 2 · Core AI Brain"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "channel": "test",
+            "channel_user_id": "={{ $json.run_id }}-{{ $json.test_id }}",
+            "message_id": "={{ $json.run_id }}-{{ $json.test_id }}",
+            "text": "={{ $json.message }}",
+            "message_type": "text",
+            "customer_name": "={{ $json.sender_name }}",
+            "received_at": "={{ $now.toISO() }}"
+          },
+          "convertFieldsToString": false,
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "schema": [
+            {
+              "id": "channel",
+              "displayName": "channel",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "channel_user_id",
+              "displayName": "channel_user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message_type",
+              "displayName": "message_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "received_at",
+              "displayName": "received_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "n294",
+      "name": "Run Core AI Brain",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        900,
+        2900
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = $('Loop Over Tests').first().json;\nconst r = $json;\nlet actual = r.route || 'error';\nif (actual === 'booking') actual = { incomplete: 'booking_incomplete', invalid: 'booking_invalid' }[r.booking_status] || 'booking';\nconst passed = actual === t.expected_route;\nreturn [{ json: { test_id: t.test_id, actual_intent: r.intent || '', actual_route: actual,\n  actual_reply: String(r.reply || r.error || '').slice(0, 500), passed: passed ? 'yes' : 'no', run_at: $now.toISO() } }];"
+      },
+      "id": "n295",
+      "name": "Grade Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        2900
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 534616513,
+          "mode": "id",
+          "cachedResultName": "Untitled"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "test_id": "={{ $json.test_id }}",
+            "actual_intent": "={{ $json.actual_intent }}",
+            "actual_route": "={{ $json.actual_route }}",
+            "actual_reply": "={{ $json.actual_reply }}",
+            "passed": "={{ $json.passed }}",
+            "run_at": "={{ $json.run_at }}"
+          },
+          "matchingColumns": [
+            "test_id"
+          ],
+          "convertFieldsToString": true,
+          "schema": [
+            {
+              "id": "test_id",
+              "displayName": "test_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "actual_intent",
+              "displayName": "actual_intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "actual_route",
+              "displayName": "actual_route",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "actual_reply",
+              "displayName": "actual_reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "passed",
+              "displayName": "passed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "run_at",
+              "displayName": "run_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "n296",
+      "name": "Save Result",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        2900
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "n297",
+      "name": "Pause for Rate Limits",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        2900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst passed = rows.filter(r => r.passed === 'yes').length;\nreturn [{ json: { total: rows.length, passed, failed: rows.length - passed,\n  pass_rate: rows.length ? Math.round(passed * 100 / rows.length) + '%' : 'n/a',\n  failures: rows.filter(r => r.passed !== 'yes').map(r => `${r.test_id}: got ${r.actual_route}`) } }];"
+      },
+      "id": "n298",
+      "name": "Test Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        3140
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Handled Error": {
+      "main": [
+        [
+          {
+            "node": "Get Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Config": {
+      "main": [
+        [
+          {
+            "node": "Classify Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Error": {
+      "main": [
+        [
+          {
+            "node": "Recent Same Errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recent Same Errors": {
+      "main": [
+        [
+          {
+            "node": "Throttle Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Throttle Check": {
+      "main": [
+        [
+          {
+            "node": "Write Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Error Log": {
+      "main": [
+        [
+          {
+            "node": "Send Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert?": {
+      "main": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Alert": {
+      "main": [
+        [
+          {
+            "node": "Critical?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Critical?": {
+      "main": [
+        [
+          {
+            "node": "Email Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Config (Heartbeat)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Config (Heartbeat)": {
+      "main": [
+        [
+          {
+            "node": "Ping Public URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping Public URL": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Health": {
+      "main": [
+        [
+          {
+            "node": "Healthy?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Healthy?": {
+      "main": [
+        [
+          {
+            "node": "All Good",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Heartbeat Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Heartbeat Failed": {
+      "main": [
+        [
+          {
+            "node": "Get Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Day 21:15": {
+      "main": [
+        [
+          {
+            "node": "Get Config (Digest)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Config (Digest)": {
+      "main": [
+        [
+          {
+            "node": "Read Error Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Error Log": {
+      "main": [
+        [
+          {
+            "node": "Read All Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Tickets": {
+      "main": [
+        [
+          {
+            "node": "Read Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Conversations": {
+      "main": [
+        [
+          {
+            "node": "Build Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest": {
+      "main": [
+        [
+          {
+            "node": "Email Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Digest": {
+      "main": [
+        [
+          {
+            "node": "Post Digest to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 10 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Config (SLA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Config (SLA)": {
+      "main": [
+        [
+          {
+            "node": "Read Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tickets": {
+      "main": [
+        [
+          {
+            "node": "Find SLA Breaches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find SLA Breaches": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Breaches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Breaches": {
+      "main": [
+        [
+          {
+            "node": "All Breaches Handled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Escalation": {
+      "main": [
+        [
+          {
+            "node": "Alert Staff Group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Staff Group": {
+      "main": [
+        [
+          {
+            "node": "Email Manager?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Manager?": {
+      "main": [
+        [
+          {
+            "node": "Email Clinic Manager",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Clinic Manager": {
+      "main": [
+        [
+          {
+            "node": "Record Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Escalation": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Breaches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Store in Vector Memory",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Store in Vector Memory",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split by Paragraphs": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "KB Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When n8n Starts": {
+      "main": [
+        [
+          {
+            "node": "Get KB Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Get KB Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get KB Document": {
+      "main": [
+        [
+          {
+            "node": "Check Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Content": {
+      "main": [
+        [
+          {
+            "node": "Store in Vector Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store in Vector Memory": {
+      "main": [
+        [
+          {
+            "node": "Ingest Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Tests": {
+      "main": [
+        [
+          {
+            "node": "Read Test Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Test Messages": {
+      "main": [
+        [
+          {
+            "node": "Prepare Test Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Test Run": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tests": {
+      "main": [
+        [
+          {
+            "node": "Test Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run Core AI Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Core AI Brain": {
+      "main": [
+        [
+          {
+            "node": "Grade Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grade Result": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Result": {
+      "main": [
+        [
+          {
+            "node": "Pause for Rate Limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause for Rate Limits": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Cairo"
+  }
+}
